@@ -1,0 +1,7 @@
+{
+    "name": "ebremner17/eb_config",
+    "description": "Site config for ericbremner.",
+    "type": "drupal-custom-module",
+    "homepage": "https://github.com/ebremner17/eb_config",
+    "keywords": ["Drupal"]
+}
