@@ -1,0 +1,78 @@
+<?php
+
+/**
+ * @file
+ * Hook implementations for the EB Config module.
+ */
+
+use Drupal\Core\Block\BlockPluginInterface;
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+
+/**
+ * Implements hook_entity_base_field_info().
+ */
+function eb_config_entity_base_field_info(EntityTypeInterface $entity_type) {
+  if ($entity_type->id() !== 'canvas_page') {
+    return [];
+  }
+
+  $fields = [];
+  $fields['display_title'] = BaseFieldDefinition::create('boolean')
+    ->setLabel(t('Display title'))
+    ->setDescription(t('Show the page title on the page.'))
+    ->setRevisionable(TRUE)
+    ->setDefaultValue(TRUE)
+    ->setDisplayOptions('form', [
+      'type' => 'boolean_checkbox',
+      'settings' => ['display_label' => TRUE],
+      'weight' => 2,
+    ])
+    ->setDisplayConfigurable('form', TRUE);
+
+  return $fields;
+}
+
+/**
+ * Determines whether the current route's Canvas page has its title hidden.
+ *
+ * @param array $cache_tags
+ *   Cache tags to merge the entity's cache tags into, if applicable.
+ */
+function _eb_config_title_is_hidden(array &$cache_tags = []): bool {
+  $entity = \Drupal::routeMatch()->getParameter('canvas_page');
+  if (!$entity instanceof ContentEntityInterface || !$entity->hasField('display_title')) {
+    return FALSE;
+  }
+  $cache_tags = Cache::mergeTags($cache_tags, $entity->getCacheTags());
+  return !$entity->get('display_title')->value;
+}
+
+/**
+ * Implements hook_block_view_page_title_block_alter().
+ *
+ * Hides the page title block for Canvas pages whose "Display title" field
+ * has been unchecked.
+ */
+function eb_config_block_view_page_title_block_alter(array &$build, BlockPluginInterface $block) {
+  $cache_tags = $build['#cache']['tags'] ?? [];
+  $hidden = _eb_config_title_is_hidden($cache_tags);
+  $build['#cache']['tags'] = $cache_tags;
+  if ($hidden) {
+    $build['#access'] = FALSE;
+  }
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for html.html.twig.
+ *
+ * Adds a body class when the page title is hidden, so the theme can remove
+ * the empty space that would otherwise sit above the page content.
+ */
+function eb_config_preprocess_html(array &$variables) {
+  if (_eb_config_title_is_hidden()) {
+    $variables['attributes']['class'][] = 'page-title-hidden';
+  }
+}

@@ -1,0 +1,90 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the EB Config module.
+ */
+
+/**
+ * Deletes the default blocks Drupal auto-places on erics_theme the first
+ * time it's installed (copied over from whatever theme was previously
+ * default). These aren't part of this site's exported configuration, so
+ * they survive config imports untouched and keep reappearing after a
+ * fresh install of the theme.
+ *
+ * @see block_theme_initialize()
+ */
+function eb_config_remove_stray_erics_theme_blocks() {
+  $suffixes = [
+    'account_menu',
+    'breadcrumbs',
+    'help',
+    'powered',
+    'secondary_local_tasks',
+  ];
+  foreach ($suffixes as $suffix) {
+    $config = \Drupal::configFactory()->getEditable('block.block.erics_theme_' . $suffix);
+    if (!$config->isNew()) {
+      $config->delete();
+    }
+  }
+}
+
+/**
+ * Creates the Canvas Editor role, granting permission to manage Canvas pages.
+ */
+function eb_config_create_canvas_editor_role() {
+  if (\Drupal\user\Entity\Role::load('canvas_editor')) {
+    return;
+  }
+  \Drupal\user\Entity\Role::create([
+    'id' => 'canvas_editor',
+    'label' => 'Canvas Editor',
+  ])->save();
+  user_role_grant_permissions('canvas_editor', [
+    'create canvas_page',
+    'edit canvas_page',
+    'delete canvas_page',
+  ]);
+}
+
+/**
+ * Implements hook_install().
+ */
+function eb_config_install() {
+  eb_config_remove_stray_erics_theme_blocks();
+  eb_config_create_canvas_editor_role();
+}
+
+/**
+ * Removes stray default blocks auto-placed on erics_theme.
+ */
+function eb_config_update_10001() {
+  eb_config_remove_stray_erics_theme_blocks();
+}
+
+/**
+ * Creates the Canvas Editor role.
+ */
+function eb_config_update_10002() {
+  eb_config_create_canvas_editor_role();
+}
+
+/**
+ * Installs the "Display title" field added to Canvas pages.
+ */
+function eb_config_update_10003() {
+  $storage_definition = \Drupal\Core\Field\BaseFieldDefinition::create('boolean')
+    ->setLabel(t('Display title'))
+    ->setDescription(t('Show the page title on the page.'))
+    ->setRevisionable(TRUE)
+    ->setDefaultValue(TRUE)
+    ->setDisplayOptions('form', [
+      'type' => 'boolean_checkbox',
+      'settings' => ['display_label' => TRUE],
+      'weight' => 2,
+    ])
+    ->setDisplayConfigurable('form', TRUE);
+  \Drupal::entityDefinitionUpdateManager()
+    ->installFieldStorageDefinition('display_title', 'canvas_page', 'eb_config', $storage_definition);
+}
